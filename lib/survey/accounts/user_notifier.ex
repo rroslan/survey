@@ -9,7 +9,7 @@ defmodule Survey.Accounts.UserNotifier do
     email =
       new()
       |> to(recipient)
-      |> from({"Survey", "contact@example.com"})
+      |> from({"Survey", "noreply@applikasi.tech"})
       |> subject(subject)
       |> text_body(body)
 

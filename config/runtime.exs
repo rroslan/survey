@@ -28,7 +28,7 @@ if config_env() == :prod do
       For example: ecto://USER:PASS@HOST/DATABASE
       """
 
-  config :targeted_survey, TargetedSurvey.Mailer,
+  config :survey, Survey.Mailer,
     adapter: Resend.Swoosh.Adapter,
     api_key: System.fetch_env!("RESEND_API_KEY")
 
