@@ -28,6 +28,12 @@ if config_env() == :prod do
       For example: ecto://USER:PASS@HOST/DATABASE
       """
 
+  config :targeted_survey, TargetedSurvey.Mailer,
+    adapter: Resend.Swoosh.Adapter,
+    api_key: System.fetch_env!("RESEND_API_KEY")
+
+  config :swoosh, :api_client, Swoosh.ApiClient.Finch
+
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
   config :survey, Survey.Repo,
