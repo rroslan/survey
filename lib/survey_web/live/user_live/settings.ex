@@ -1,6 +1,7 @@
 defmodule SurveyWeb.UserLive.Settings do
   use SurveyWeb, :live_view
 
+  # Keep sudo mode if changing email requires it, otherwise remove this too.
   on_mount {SurveyWeb.UserAuth, :require_sudo_mode}
 
   alias Survey.Accounts
@@ -10,7 +11,7 @@ defmodule SurveyWeb.UserLive.Settings do
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <.header class="text-center">
         Account Settings
-        <:subtitle>Manage your account email address and password settings</:subtitle>
+        <:subtitle>Manage your account email address</:subtitle>
       </.header>
 
       <.form for={@email_form} id="email_form" phx-submit="update_email" phx-change="validate_email">
@@ -24,41 +25,7 @@ defmodule SurveyWeb.UserLive.Settings do
         <.button variant="primary" phx-disable-with="Changing...">Change Email</.button>
       </.form>
 
-      <div class="divider" />
-
-      <.form
-        for={@password_form}
-        id="password_form"
-        action={~p"/users/update-password"}
-        method="post"
-        phx-change="validate_password"
-        phx-submit="update_password"
-        phx-trigger-action={@trigger_submit}
-      >
-        <input
-          name={@password_form[:email].name}
-          type="hidden"
-          id="hidden_user_email"
-          autocomplete="username"
-          value={@current_email}
-        />
-        <.input
-          field={@password_form[:password]}
-          type="password"
-          label="New password"
-          autocomplete="new-password"
-          required
-        />
-        <.input
-          field={@password_form[:password_confirmation]}
-          type="password"
-          label="Confirm new password"
-          autocomplete="new-password"
-        />
-        <.button variant="primary" phx-disable-with="Saving...">
-          Save Password
-        </.button>
-      </.form>
+      <%!-- Password form removed --%>
     </Layouts.app>
     """
   end
@@ -79,14 +46,14 @@ defmodule SurveyWeb.UserLive.Settings do
   def mount(_params, _session, socket) do
     user = socket.assigns.current_scope.user
     email_changeset = Accounts.change_user_email(user, %{}, validate_email: false)
-    password_changeset = Accounts.change_user_password(user, %{}, hash_password: false)
+    # password_changeset = Accounts.change_user_password(user, %{}, hash_password: false) # Removed
 
     socket =
       socket
-      |> assign(:current_email, user.email)
+      |> assign(:current_email, user.email) # Keep if needed elsewhere, otherwise remove
       |> assign(:email_form, to_form(email_changeset))
-      |> assign(:password_form, to_form(password_changeset))
-      |> assign(:trigger_submit, false)
+      # |> assign(:password_form, to_form(password_changeset)) # Removed
+      # |> assign(:trigger_submit, false) # Removed
 
     {:ok, socket}
   end
@@ -106,7 +73,7 @@ defmodule SurveyWeb.UserLive.Settings do
   def handle_event("update_email", params, socket) do
     %{"user" => user_params} = params
     user = socket.assigns.current_scope.user
-    true = Accounts.sudo_mode?(user)
+    true = Accounts.sudo_mode?(user) # Ensure sudo mode is checked for email change
 
     case Accounts.change_user_email(user, user_params) do
       %{valid?: true} = changeset ->
@@ -124,29 +91,6 @@ defmodule SurveyWeb.UserLive.Settings do
     end
   end
 
-  def handle_event("validate_password", params, socket) do
-    %{"user" => user_params} = params
-
-    password_form =
-      socket.assigns.current_scope.user
-      |> Accounts.change_user_password(user_params, hash_password: false)
-      |> Map.put(:action, :validate)
-      |> to_form()
-
-    {:noreply, assign(socket, password_form: password_form)}
-  end
-
-  def handle_event("update_password", params, socket) do
-    %{"user" => user_params} = params
-    user = socket.assigns.current_scope.user
-    true = Accounts.sudo_mode?(user)
-
-    case Accounts.change_user_password(user, user_params) do
-      %{valid?: true} = changeset ->
-        {:noreply, assign(socket, trigger_submit: true, password_form: to_form(changeset))}
-
-      changeset ->
-        {:noreply, assign(socket, password_form: to_form(changeset, action: :insert))}
-    end
-  end
+  # handle_event("validate_password", ...) removed
+  # handle_event("update_password", ...) removed
 end

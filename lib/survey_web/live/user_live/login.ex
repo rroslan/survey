@@ -8,12 +8,12 @@ defmodule SurveyWeb.UserLive.Login do
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <div class="mx-auto max-w-sm space-y-4">
         <.header class="text-center">
-          <p>Log in</p>
+          <p>Log in or Reauthenticate</p>
           <:subtitle>
             <%= if @current_scope do %>
-              You need to reauthenticate to perform sensitive actions on your account.
+              Enter your email to receive a link to reauthenticate.
             <% else %>
-              Don't have an account? <.link
+              Enter your email to receive a login link. Don't have an account? <.link
                 navigate={~p"/users/register"}
                 class="font-semibold text-brand hover:underline"
                 phx-no-format
@@ -36,7 +36,6 @@ defmodule SurveyWeb.UserLive.Login do
           :let={f}
           for={@form}
           id="login_form_magic"
-          action={~p"/users/log-in"}
           phx-submit="submit_magic"
         >
           <.input
@@ -49,44 +48,11 @@ defmodule SurveyWeb.UserLive.Login do
             phx-mounted={JS.focus()}
           />
           <.button class="w-full" variant="primary">
-            Log in with email <span aria-hidden="true">→</span>
+            Send Login Link <span aria-hidden="true">→</span>
           </.button>
         </.form>
 
-        <div class="divider">or</div>
-
-        <.form
-          :let={f}
-          for={@form}
-          id="login_form_password"
-          action={~p"/users/log-in"}
-          phx-submit="submit_password"
-          phx-trigger-action={@trigger_submit}
-        >
-          <.input
-            readonly={!!@current_scope}
-            field={f[:email]}
-            type="email"
-            label="Email"
-            autocomplete="username"
-            required
-          />
-          <.input
-            field={@form[:password]}
-            type="password"
-            label="Password"
-            autocomplete="current-password"
-          />
-          <.input
-            :if={!@current_scope}
-            field={f[:remember_me]}
-            type="checkbox"
-            label="Keep me logged in"
-          />
-          <.button class="w-full" variant="primary">
-            Log in <span aria-hidden="true">→</span>
-          </.button>
-        </.form>
+        <%!-- Password form and divider removed --%>
       </div>
     </Layouts.app>
     """
@@ -97,14 +63,14 @@ defmodule SurveyWeb.UserLive.Login do
       Phoenix.Flash.get(socket.assigns.flash, :email) ||
         get_in(socket.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
 
+    # Only need the email field for the magic link form
     form = to_form(%{"email" => email}, as: "user")
 
-    {:ok, assign(socket, form: form, trigger_submit: false)}
+    # No need for trigger_submit anymore
+    {:ok, assign(socket, form: form)}
   end
 
-  def handle_event("submit_password", _params, socket) do
-    {:noreply, assign(socket, :trigger_submit, true)}
-  end
+  # handle_event("submit_password", ...) removed
 
   def handle_event("submit_magic", %{"user" => %{"email" => email}}, socket) do
     if user = Accounts.get_user_by_email(email) do
@@ -120,6 +86,8 @@ defmodule SurveyWeb.UserLive.Login do
     {:noreply,
      socket
      |> put_flash(:info, info)
+     # Optional: You might not need to navigate away immediately after requesting the link.
+     # Consider removing the push_navigate if you want the user to stay on the page.
      |> push_navigate(to: ~p"/users/log-in")}
   end
 

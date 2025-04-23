@@ -8,9 +8,11 @@ defmodule SurveyWeb.UserLive.LoginTest do
     test "renders login page", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/users/log-in")
 
-      assert html =~ "Log in"
-      assert html =~ "Register"
-      assert html =~ "Log in with email"
+      # Updated assertions to match the magic-link-only view
+      assert html =~ "Log in or Reauthenticate"
+      assert html =~ "Sign up" # Link to registration
+      assert html =~ "Send Login Link" # Button text
+      refute html =~ "password" # Ensure password field is gone
     end
   end
 
@@ -43,51 +45,19 @@ defmodule SurveyWeb.UserLive.LoginTest do
     end
   end
 
-  describe "user login - password" do
-    test "redirects if user logs in with valid credentials", %{conn: conn} do
-      user = user_fixture() |> set_password()
-
-      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
-
-      form =
-        form(lv, "#login_form_password",
-          user: %{email: user.email, password: valid_user_password(), remember_me: true}
-        )
-
-      conn = submit_form(form, conn)
-
-      assert redirected_to(conn) == ~p"/"
-    end
-
-    test "redirects to login page with a flash error if credentials are invalid", %{
-      conn: conn
-    } do
-      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
-
-      form =
-        form(lv, "#login_form_password",
-          user: %{email: "test@email.com", password: "123456", remember_me: true}
-        )
-
-      render_submit(form)
-
-      conn = follow_trigger_action(form, conn)
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) == "Invalid email or password"
-      assert redirected_to(conn) == ~p"/users/log-in"
-    end
-  end
+  # describe "user login - password" do ... end block removed entirely
 
   describe "login navigation" do
-    test "redirects to registration page when the Register button is clicked", %{conn: conn} do
+    test "redirects to registration page when the Sign up link is clicked", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/log-in")
 
-      {:ok, _login_live, login_html} =
+      {:ok, _login_live, registration_html} = # Renamed variable for clarity
         lv
-        |> element("main a", "Sign up")
+        |> element("main a", "Sign up") # Using the actual link text
         |> render_click()
         |> follow_redirect(conn, ~p"/users/register")
 
-      assert login_html =~ "Register"
+      assert registration_html =~ "Register" # Check content of the target page
     end
   end
 
@@ -100,12 +70,17 @@ defmodule SurveyWeb.UserLive.LoginTest do
     test "shows login page with email filled in", %{conn: conn, user: user} do
       {:ok, _lv, html} = live(conn, ~p"/users/log-in")
 
-      assert html =~ "You need to reauthenticate"
-      refute html =~ "Register"
-      assert html =~ "Log in with email"
+      # Updated assertions for re-auth context
+      assert html =~ "Enter your email to receive a link to reauthenticate" # More specific text
+      refute html =~ "Sign up" # Registration link shouldn't be prominent
+      assert html =~ "Send Login Link" # Button text
 
+      # Keep assertion for pre-filled email
       assert html =~
                ~s(<input type="email" name="user[email]" id="login_form_magic_email" value="#{user.email}")
+
+      # Ensure password field is not present even in re-auth
+      refute html =~ "password"
     end
   end
 end
