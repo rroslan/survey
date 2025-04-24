@@ -149,7 +149,7 @@ defmodule Survey.Accounts do
   """
   def get_user_by_magic_link_token(token) do
     with {:ok, query} <- UserToken.verify_magic_link_token_query(token),
-         {user, _token} <- Repo.one(query) do
+         %User{} = user <- Repo.one(query) do
       user
     else
       _ -> nil
@@ -167,19 +167,20 @@ defmodule Survey.Accounts do
   2. The user has not confirmed their email. In this case, the user gets confirmed,
      logged in, and all tokens (including session ones) are expired.
   """
+
   def login_user_by_magic_link(token) do
     {:ok, query} = UserToken.verify_magic_link_token_query(token)
 
     case Repo.one(query) do
       # Case where user is unconfirmed (and has no password, as password fields are removed)
-      {%User{confirmed_at: nil} = user, _token} ->
+      %User{confirmed_at: nil} = user ->
         user
         |> User.confirm_changeset() # Assumes User.confirm_changeset exists
         |> update_user_and_delete_all_tokens()
 
       # Case where user is already confirmed
-      {user, token} ->
-        Repo.delete!(token)
+      %User{} = user ->
+        Repo.delete_all(UserToken.by_user_and_contexts_query(user, ["login"]))
         {:ok, user, []}
 
       # Case where token is invalid or expired
