@@ -9,3 +9,4 @@ Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
 * Added RESEND_API_KEY in app secret, and add resend config in runtime if prod
 * FLY_API_TOKEN added to deploy action on github
+* Add domain
