@@ -1,6 +1,6 @@
 defmodule Survey.Accounts do
   @moduledoc """
-  The Accounts context.
+  The Accounts context. Handles user management primarily via email and magic links.
   """
 
   import Ecto.Query, warn: false
@@ -26,23 +26,7 @@ defmodule Survey.Accounts do
     Repo.get_by(User, email: email)
   end
 
-  @doc """
-  Gets a user by email and password.
-
-  ## Examples
-
-      iex> get_user_by_email_and_password("foo@example.com", "correct_password")
-      %User{}
-
-      iex> get_user_by_email_and_password("foo@example.com", "invalid_password")
-      nil
-
-  """
-  def get_user_by_email_and_password(email, password)
-      when is_binary(email) and is_binary(password) do
-    user = Repo.get_by(User, email: email)
-    if User.valid_password?(user, password), do: user
-  end
+  # Removed get_user_by_email_and_password/2
 
   @doc """
   Gets a single user.
@@ -63,20 +47,20 @@ defmodule Survey.Accounts do
   ## User registration
 
   @doc """
-  Registers a user.
+  Registers a user using only their email.
 
   ## Examples
 
-      iex> register_user(%{field: value})
+      iex> register_user(%{email: "new@example.com"})
       {:ok, %User{}}
 
-      iex> register_user(%{field: bad_value})
+      iex> register_user(%{email: "invalid"})
       {:error, %Ecto.Changeset{}}
 
   """
   def register_user(attrs) do
     %User{}
-    |> User.email_changeset(attrs)
+    |> User.email_changeset(attrs) # Assumes User.email_changeset handles registration validation
     |> Repo.insert()
   end
 
@@ -136,46 +120,10 @@ defmodule Survey.Accounts do
     |> Ecto.Multi.delete_all(:tokens, UserToken.by_user_and_contexts_query(user, [context]))
   end
 
-  @doc """
-  Returns an `%Ecto.Changeset{}` for changing the user password.
+  # Removed change_user_password/3
+  # Removed update_user_password/2
 
-  See `Survey.Accounts.User.password_changeset/3` for a list of supported options.
-
-  ## Examples
-
-      iex> change_user_password(user)
-      %Ecto.Changeset{data: %User{}}
-
-  """
-  def change_user_password(user, attrs \\ %{}, opts \\ []) do
-    User.password_changeset(user, attrs, opts)
-  end
-
-  @doc """
-  Updates the user password.
-
-  Returns the updated user, as well as a list of expired tokens.
-
-  ## Examples
-
-      iex> update_user_password(user, %{password: ...})
-      {:ok, %User{}, [...]}
-
-      iex> update_user_password(user, %{password: "too short"})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def update_user_password(user, attrs) do
-    user
-    |> User.password_changeset(attrs)
-    |> update_user_and_delete_all_tokens()
-    |> case do
-      {:ok, user, expired_tokens} -> {:ok, user, expired_tokens}
-      {:error, :user, changeset, _} -> {:error, changeset}
-    end
-  end
-
-  ## Session
+  ## Session & Magic Links
 
   @doc """
   Generates a session token.
@@ -187,7 +135,7 @@ defmodule Survey.Accounts do
   end
 
   @doc """
-  Gets the user with the given signed token.
+  Gets the user with the given signed session token.
 
   If the token is valid `{user, token_inserted_at}` is returned, otherwise `nil` is returned.
   """
@@ -211,44 +159,30 @@ defmodule Survey.Accounts do
   @doc """
   Logs the user in by magic link.
 
-  There are three cases to consider:
+  There are two main cases:
 
   1. The user has already confirmed their email. They are logged in
-     and the magic link is expired.
+     and the magic link token is expired.
 
-  2. The user has not confirmed their email and no password is set.
-     In this case, the user gets confirmed, logged in, and all tokens -
-     including session ones - are expired. In theory, no other tokens
-     exist but we delete all of them for best security practices.
-
-  3. The user has not confirmed their email but a password is set.
-     This cannot happen in the default implementation but may be the
-     source of security pitfalls. See the "Mixing magic link and password registration" section of
-     `mix help phx.gen.auth`.
+  2. The user has not confirmed their email. In this case, the user gets confirmed,
+     logged in, and all tokens (including session ones) are expired.
   """
   def login_user_by_magic_link(token) do
     {:ok, query} = UserToken.verify_magic_link_token_query(token)
 
     case Repo.one(query) do
-      # Prevent session fixation attacks by disallowing magic links for unconfirmed users with password
-      {%User{confirmed_at: nil, hashed_password: hash}, _token} when not is_nil(hash) ->
-        raise """
-        magic link log in is not allowed for unconfirmed users with a password set!
-
-        This cannot happen with the default implementation, which indicates that you
-        might have adapted the code to a different use case. Please make sure to read the
-        "Mixing magic link and password registration" section of `mix help phx.gen.auth`.
-        """
-
+      # Case where user is unconfirmed (and has no password, as password fields are removed)
       {%User{confirmed_at: nil} = user, _token} ->
         user
-        |> User.confirm_changeset()
+        |> User.confirm_changeset() # Assumes User.confirm_changeset exists
         |> update_user_and_delete_all_tokens()
 
+      # Case where user is already confirmed
       {user, token} ->
         Repo.delete!(token)
         {:ok, user, []}
 
+      # Case where token is invalid or expired
       nil ->
         {:error, :not_found}
     end
@@ -282,7 +216,7 @@ defmodule Survey.Accounts do
   end
 
   @doc """
-  Deletes the signed token with the given context.
+  Deletes the signed session token with the given context.
   """
   def delete_user_session_token(token) do
     Repo.delete_all(UserToken.by_token_and_context_query(token, "session"))
@@ -291,6 +225,8 @@ defmodule Survey.Accounts do
 
   ## Token helper
 
+  # This function is used by email confirmation and potentially magic link login
+  # if the user was previously unconfirmed. Keep it.
   defp update_user_and_delete_all_tokens(changeset) do
     %{data: %User{} = user} = changeset
 
